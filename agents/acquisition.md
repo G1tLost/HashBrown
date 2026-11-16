@@ -29,6 +29,14 @@ Preserve these invariants:
   explicitly supplied saved import source, including hardlinks and Windows short paths.
 - Scope capacity observations to the analyst case filesystem, mark declarations
   unverified and remote extent/staging/roles unknown. Plans never certify capture completeness.
+- Keep detached handoff creation/verification outside Case constructors, locks and repair.
+  Rehash explicitly selected committed images, validate all source original metadata/custody,
+  and reject detected source changes before exclusive publication outside the case store.
+- Verify detached images only beneath the explicitly chosen canonical evidence root.
+  Never open historical source paths, contact APIs or copy images from handoff commands.
+- Distinguish verified selected custody bodies, unverified omitted bodies, declared
+  link continuity and unsigned external authenticity. Partial captures stay partial;
+  manifest/byte hashes never grant native capture, completeness or readability qualification.
 
 Validate changes with meaningful interruption, path/binding, source-change,
 metadata-tamper, custody and partial-capture tests. The inert demo and native file

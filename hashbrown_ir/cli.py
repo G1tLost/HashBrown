@@ -33,6 +33,17 @@ def parser():
     sub.add_argument("--api-config", type=Path, required=True)
     sub.add_argument("--org", default="root")
     cmd.add_parser("demo", help="generate inert fixtures, import both into a new case, verify and report")
+    handoff_cmd = cmd.add_parser("handoff", help="create or verify a detached portable evidence manifest").add_subparsers(dest="action", required=True)
+    sub = handoff_cmd.add_parser("create")
+    sub.add_argument("case_id")
+    sub.add_argument("--job", action="append", required=True, help="explicit saved acquisition ID; repeat to select more")
+    sub.add_argument("--output", type=Path, required=True, help="new JSON outside the source case store; parent must exist")
+    sub.add_argument("--format", choices=("json", "text"), default="json")
+    sub = handoff_cmd.add_parser("verify")
+    sub.add_argument("--manifest", type=Path, required=True)
+    sub.add_argument("--evidence-root", type=Path, required=True)
+    sub.add_argument("--manifest-sha256", help="complete manifest file SHA-256 obtained independently")
+    sub.add_argument("--format", choices=("json", "text"), default="json")
     for action in ("verify", "report"):
         cmd.add_parser(action).add_argument("case_id")
     acq_cmd = cmd.add_parser("acquisition", help="collect, import, resume, verify and annotate images").add_subparsers(dest="action", required=True)
@@ -131,6 +142,10 @@ def run_acquisition(args, case):
 
 
 def run(args):
+    if args.command == "handoff":
+        from . import handoff
+        result = handoff.create(args.root, args.case_id, args.job, args.output) if args.action == "create" else handoff.verify(args.manifest, args.evidence_root, args.manifest_sha256)
+        return result, {"created": 0, "verified": 0, "partial": 2, "failed": 1}[result["status"]]
     if getattr(args, "preflight", False):
         from .preflight import plan
         result = plan(args)
@@ -171,7 +186,10 @@ def main(argv=None):
     args = parser().parse_args(argv)
     try:
         result, code = run(args)
-        if getattr(args, "preflight", False) and args.plan_format == "text":
+        if args.command == "handoff" and args.format == "text":
+            from .handoff import render_text
+            print(render_text(result))
+        elif getattr(args, "preflight", False) and args.plan_format == "text":
             from .preflight import render_text
             print(render_text(result))
         else:

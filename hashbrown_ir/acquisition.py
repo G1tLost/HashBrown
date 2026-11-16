@@ -42,6 +42,11 @@ def load(case):
     if not path.exists() and any(p.is_file() for p in (case.path / "images").rglob("*")):
         raise CaseError("Binary evidence exists but its acquisition ledger is missing.")
     state = read(path) if path.exists() else dict(schema=1, case_id=case.id, label=case.label, jobs={}, custody=[])
+    return validate_ledger(case, state, case.manifest())
+
+
+def validate_ledger(case, state, manifest):
+    """Validate already-read ledger data without modifying or opening case files."""
     if state.get("schema") != 1 or state.get("case_id") != case.id or state.get("label") != case.label:
         raise CaseError("Acquisition ledger belongs to a different case or schema.")
     previous = "0" * 64
@@ -50,7 +55,7 @@ def load(case):
         if event.get("sequence") != index + 1 or event.get("previous") != previous or digest(encode(body)) != event.get("sha256"):
             raise CaseError("Acquisition custody chain verification failed.")
         previous = event["sha256"]
-    metadata = {(e["artifact"], e["sha256"]) for e in case.manifest()["artifacts"] if e["dataset"] == META}
+    metadata = {(e["artifact"], e["sha256"]) for e in manifest["artifacts"] if e["dataset"] == META}
     for key, job in state["jobs"].items():
         if not ID.fullmatch(key) or job.get("id") != key or job.get("label") != case.label:
             raise CaseError("Invalid acquisition identity.")

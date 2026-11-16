@@ -1,6 +1,6 @@
 # HashBrown
 
-**HashBrown 0.2.0 is a standalone disk/RAM acquisition and evidence-tracking tool.**
+**HashBrown 0.3.0 is a standalone disk/RAM acquisition and evidence-tracking tool.**
 It creates its own cases, imports existing image files, schedules Windows capture
 through an existing Velociraptor server, downloads preserved uploads in resumable
 chunks, checks SHA-256, and records a hash-chained custody history.
@@ -142,13 +142,39 @@ or reported gaps. Argument usage errors also exit `2`. `acquisition status`
 returns `0` after successful inspection; inspect each job's `status` and `integrity`.
 The global `--root` option goes **before** the command. Its default is `./hashbrown-cases`.
 
+## Portable evidence handoff
+
+Export explicitly selected committed images' records, then verify manually relocated
+images with the detached manifest and HashBrown alone. The recipient does not need
+the original case, server, configuration or credentials.
+
+```powershell
+hashbrown --root D:\HashBrownCases handoff create HB-2026-REPLACE `
+  --job ACQ-REPLACE --output D:\PrivateHandoff\incident.json
+# Copy selected images yourself, retaining the paths listed in the summary.
+hashbrown handoff verify --manifest E:\Received\incident.json `
+  --evidence-root E:\Received --manifest-sha256 INDEPENDENT_MANIFEST_FILE_SHA256
+```
+
+The producer freshly hashes selected saved images, checks original metadata/custody,
+and writes one new manifest outside the source store without copying images. The
+recipient streams fresh hashes and checks the exported provenance. Both leave the
+case/images unchanged. Use `--format text` for readable output. Partial captures
+remain partial (exit `2`), even when bytes match; integrity failures exit `1`.
+
+The manifest is unsigned. Only selected custody event bodies are exported and
+verified; omitted bodies have unverified hash links only. Exchange the full manifest
+file hash through an independent channel. No result qualifies native capture or
+image readability. See [handoff instructions, schema and limits](docs/handoff.md),
+including canonical local paths and the output filesystem's hardlink requirement.
+
 ## Validation and limits
 
 ```powershell
 python -m unittest discover -s tests -v
 ```
 
-The 52 package tests cover preserved hashes, interruption/resume, wrong endpoint/path,
+The package tests cover preserved hashes, interruption/resume, wrong endpoint/path,
 changed images, tampering, partial captures, custody, case isolation, metadata,
 artifact export, read-only preflight and the inert CLI demo. Read the [validation record](docs/validation.md)
 for precise boundaries. **Actual physical-device imaging and kernel-driver RAM
@@ -163,8 +189,8 @@ authorization, independent custody signatures or automatic incident correlation.
 The [A2 designated-VM acceptance procedure](docs/a2-lab-acceptance.md) and repository-only
 `scripts/a2_lab.py` prepare bounded transfer checkpoints and reviewable runtime,
 source, byte-integrity and reader-output records. The helper never submits a
-collection or automatically qualifies native capture/readability. Its 13 additional
-tests bring the repository suite to 65; package behavior remains at 0.2.0. Actual
+collection or automatically qualifies native capture/readability. The repository
+suite now has 90 tests, including 13 A2 helper cases and 25 detached handoff cases. Actual
 physical acceptance requires an explicitly designated VM and remains outstanding.
 
 MIT license. Selected earlier MIT-licensed acquisition code was adapted; see

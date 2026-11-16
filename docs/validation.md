@@ -1,7 +1,33 @@
 # Validation record and outstanding acceptance
 
-Version: HashBrown 0.2.0. The repository has 65 automated unittest cases: the 52
-package/preflight cases plus 13 repository-only A2 acceptance-helper cases.
+Version: HashBrown 0.3.0. The repository has 90 automated unittest cases: the 52
+original package/preflight cases, 13 repository-only A2 acceptance-helper cases
+and 25 detached evidence handoff cases.
+
+The 0.3.0 Windows development suite passes (90 discovered: 88 passed and 2 skipped).
+The linked-ancestor test skips because this host cannot create symlinks; the FIFO
+test skips because Windows has no `os.mkfifo`. The Windows short-path alias rejection
+test passes. Handoff tests cover verification after relocation with the original case
+absent; modified, truncated and missing images; metadata/schema/path/binding/custody
+tampering; duplicate JSON keys; aliases/hardlinks/linked ancestors and special-file
+rejection where available; all original metadata checked before export; concurrent
+source metadata change; external exclusive publication and unsupported-hardlink
+failure; unchanged source/recipient bytes and modification times; and preserved
+partial capture status despite matching received bytes. API doubles supply remote
+provenance in unit tests only. No server, driver or physical capture was invoked.
+
+The installed smoke now exercises selected-image handoff, caller-performed relocation,
+verification with the original store unavailable, independent manifest hash checking,
+readable output and post-relocation tamper detection. Fresh-wheel release validation
+is recorded separately by the publishing coordinator. The [handoff guide](handoff.md)
+documents unsigned provenance and the limited scope of omitted custody hash links.
+
+The publishing coordinator independently built the final 0.3.0 wheel and installed
+it in a fresh HashBrown-only Windows/Python 3.14.7 environment. Isolated execution
+discovered 90 tests: 88 passed and the same two platform checks skipped. The installed
+smoke passed relocation without the original store, independent manifest-hash
+checking, JSON/text verification and tamper detection. Imports resolved from the
+new environment's `site-packages`; neither sibling tool was present.
 
 Executed in the Windows development environment:
 
