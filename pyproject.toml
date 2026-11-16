@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hashbrown-ir"
+version = "0.1.0"
+description = "Standalone disk and memory acquisition with resumable evidence preservation"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+dependencies = []
+
+[project.scripts]
+hashbrown = "hashbrown_ir.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["hashbrown_ir", "hashbrown_ir.*"]
+
+[tool.setuptools.package-data]
+hashbrown_ir = ["data/velociraptor/*.yaml"]
+

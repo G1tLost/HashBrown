@@ -1,0 +1,26 @@
+name: Custom.HashBrown.AcquireDisk
+description: |
+  Acquire the explicitly selected Windows physical disk as raw bytes.
+  Records WMI disk identity and expected size before synchronous upload.
+  Live acquisition is not an atomic snapshot. Read errors are not silently padded by HashBrown.
+type: CLIENT
+precondition: SELECT OS FROM info() WHERE OS = "windows"
+parameters:
+  - name: DiskNumber
+    type: int
+    default: "-1"
+  - name: RequestId
+  - name: MaxBytes
+    type: int
+    default: "274877906944"
+sources:
+  - query: |
+      LET Started <= timestamp(epoch=now())
+      LET Disks <= SELECT DeviceID, Model, SerialNumber, Size, BytesPerSector, Index
+          FROM wmi(query="SELECT DeviceID,Model,SerialNumber,Size,BytesPerSector,Index FROM Win32_DiskDrive")
+          WHERE Index = DiskNumber AND int(int=Size) > 0 AND int(int=Size) <= MaxBytes
+      LET Captured <= SELECT RequestId, "disk" AS EvidenceKind, FALSE AS Simulation,
+          Started, DeviceID AS SourcePath, int(int=Size) AS ExpectedSize,
+          dict(Model=Model,SerialNumber=SerialNumber,Index=Index,BytesPerSector=BytesPerSector) AS DeviceInfo,
+          upload(file=DeviceID,accessor="raw_file",name="image.raw") AS Upload FROM Disks
+      SELECT *, timestamp(epoch=now()) AS Finished FROM Captured

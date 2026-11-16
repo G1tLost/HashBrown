@@ -1,0 +1,26 @@
+name: Custom.HashBrown.AcquireMemory
+description: |
+  Acquire raw physical memory using Velociraptor's built-in WinPmem function.
+  Requires an elevated Windows x64 client and a compatible signed driver.
+  Stages the image in the client's configured temp directory before uploading.
+  HashBrown verifies the output length against ImageInfo.Run and records capture limitations.
+type: CLIENT
+precondition: SELECT OS, Architecture FROM info() WHERE OS = "windows" AND Architecture = "amd64"
+parameters:
+  - name: RequestId
+  - name: MaxBytes
+    type: int
+    default: "274877906944"
+sources:
+  - query: |
+      LET Started <= timestamp(epoch=now())
+      LET Memory <= SELECT TotalPhysicalMemory FROM wmi(query="SELECT TotalPhysicalMemory FROM Win32_ComputerSystem")
+          WHERE int(int=TotalPhysicalMemory) > 0 AND int(int=TotalPhysicalMemory) <= MaxBytes
+      LET ImagePath <= tempfile(extension=".pmem")
+      LET ImageInfo <= if(condition=Memory, then=winpmem(image_path=ImagePath,compression="None"))
+      LET Captured <= SELECT RequestId, "memory" AS EvidenceKind, FALSE AS Simulation,
+          Started, "physical memory" AS SourcePath, Size AS ExpectedSize, ImageInfo,
+          upload(file=ImagePath,accessor="file",name="image.raw") AS Upload
+          FROM stat(filename=ImagePath,accessor="file")
+          WHERE ImageInfo AND Size > 0 AND Size <= MaxBytes
+      SELECT *, timestamp(epoch=now()) AS Finished FROM Captured

@@ -1,0 +1,25 @@
+name: Custom.HashBrown.AcquireFile
+description: |
+  Preserve an existing disk or memory image, or an explicitly synthetic lab file.
+  Does not create a live memory image. Returns one upload with acquisition metadata.
+type: CLIENT
+parameters:
+  - name: SourcePath
+  - name: EvidenceKind
+    default: disk
+  - name: RequestId
+  - name: Simulation
+    type: bool
+    default: false
+  - name: MaxBytes
+    type: int
+    default: "274877906944"
+sources:
+  - query: |
+      LET Started <= timestamp(epoch=now())
+      LET Captured <= SELECT RequestId, EvidenceKind, Simulation, Started, OSPath AS SourcePath,
+          Size AS ExpectedSize, Mtime AS SourceMtime,
+          upload(file=OSPath, accessor="file", name="image.raw") AS Upload
+      FROM stat(filename=SourcePath, accessor="file")
+      WHERE Size > 0 AND Size <= MaxBytes AND NOT IsDir
+      SELECT *, timestamp(epoch=now()) AS Finished FROM Captured
