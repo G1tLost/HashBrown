@@ -47,8 +47,12 @@ def parser():
             sub.add_argument("--max-bytes", type=int, default=acq.MAX_BYTES)
             sub.add_argument("--format", choices=("raw", "vhdx", "vmdk", "other"), default="raw")
         if action in ("collect", "sync"):
-            sub.add_argument("--velociraptor", type=Path, required=action == "collect")
-            sub.add_argument("--api-config", type=Path, required=action == "collect")
+            sub.add_argument("--velociraptor", type=Path)
+            sub.add_argument("--api-config", type=Path)
+        if action in ("collect", "sync", "import"):
+            sub.add_argument("--preflight", action="store_true", help="read-only local plan; never submit, capture or write evidence")
+            sub.add_argument("--plan-format", choices=("json", "text"), help="preflight output format (default: json)")
+            sub.add_argument("--declared-bytes", type=int, help="preflight-only size estimate; does not constrain a later capture")
         if action == "collect":
             source = sub.add_mutually_exclusive_group()
             source.add_argument("--source", help="existing image file on the bound endpoint")
@@ -59,6 +63,7 @@ def parser():
         if action == "sync":
             sub.add_argument("--flow-id")
             sub.add_argument("--download-api-config", type=Path)
+            sub.add_argument("--file", type=Path, help="preflight-only explicit local import source for identity/collision checks")
         if action == "import":
             sub.add_argument("--file", type=Path, required=True)
             sub.add_argument("--sha256", help="original source SHA-256, if available")
@@ -115,6 +120,8 @@ def run_acquisition(args, case):
                 raise CaseError("A download credential also requires --velociraptor and --api-config.")
             download = endpoint.Velociraptor(args.velociraptor, args.download_api_config, bound["org_id"])
         if args.action == "collect":
+            if not api:
+                raise CaseError("Supply --velociraptor and --api-config for remote collection.")
             result = acq.start(case, client, args.kind, api, args.operator, args.source, args.disk_number,
                                args.simulation, args.max_bytes, args.format, args.timeout)
         else:
@@ -124,6 +131,14 @@ def run_acquisition(args, case):
 
 
 def run(args):
+    if getattr(args, "preflight", False):
+        from .preflight import plan
+        result = plan(args)
+        return result, {"pass": 0, "warning": 2, "fail": 1}[result["status"]]
+    if getattr(args, "plan_format", None) or getattr(args, "declared_bytes", None) is not None:
+        raise CaseError("--plan-format and --declared-bytes require --preflight.")
+    if args.command == "acquisition" and args.action == "sync" and args.file:
+        raise CaseError("--file on sync requires --preflight; a saved acquisition cannot be redirected.")
     if args.command == "fixtures":
         return create_fixtures(args.output), 0
     if args.command == "artifacts":
@@ -156,7 +171,11 @@ def main(argv=None):
     args = parser().parse_args(argv)
     try:
         result, code = run(args)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if getattr(args, "preflight", False) and args.plan_format == "text":
+            from .preflight import render_text
+            print(render_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
         return code
     except (CaseError, OSError, KeyError, TypeError, ValueError) as exc:
         print(f"hashbrown: {exc}", file=sys.stderr)

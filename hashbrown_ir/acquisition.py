@@ -17,6 +17,7 @@ from .storage import CaseError, digest, encode, now, read, save, timestamp
 META = "acquisition_metadata"
 CHUNK = 1024 * 1024
 MAX_BYTES = 256 * 1024 ** 3
+RESERVE_BYTES = 16 * CHUNK
 ACTIVE = {"submitting", "submission_unknown", "running", "downloading", "retry", "committing"}
 ARTIFACTS = {"remote-file": "Custom.HashBrown.AcquireFile", "remote-disk": "Custom.HashBrown.AcquireDisk",
              "remote-memory": "Custom.HashBrown.AcquireMemory"}
@@ -97,12 +98,43 @@ def paths(case, job):
     return folder / "image.part", folder / "image.bin"
 
 
-def new_job(case, client, kind, mode, operator, simulation=False, max_bytes=MAX_BYTES, image_format="raw"):
-    bound = binding(case, client)
+def validate_options(kind, operator, max_bytes=MAX_BYTES, image_format="raw"):
+    """Shared, side-effect-free validation for execution and read-only planning."""
     if kind not in ("disk", "memory") or not isinstance(operator, str) or not operator.strip() or len(operator) > 200:
         raise CaseError("Specify disk or memory and a named acquisition operator.")
     if type(max_bytes) is not int or max_bytes <= 0 or image_format not in ("raw", "vhdx", "vmdk", "other"):
         raise CaseError("Provide a positive byte budget and supported image format.")
+
+
+def collection_request(kind, operator, source=None, disk_number=None, simulation=False,
+                       max_bytes=MAX_BYTES, image_format="raw", timeout=86400):
+    validate_options(kind, operator, max_bytes, image_format)
+    mode = "remote-file" if source else "remote-" + kind
+    if mode not in ARTIFACTS or simulation and not source:
+        raise CaseError("Simulation requires an explicit fixture file; physical acquisition is never simulated implicitly.")
+    if mode == "remote-disk" and (type(disk_number) is not int or not 0 <= disk_number <= 1024):
+        raise CaseError("Select the intended Windows disk number explicitly.")
+    if source and disk_number is not None or kind != "disk" and disk_number is not None:
+        raise CaseError("Choose a source image file or a physical disk number.")
+    if not source and image_format != "raw" or type(timeout) is not int or not 60 <= timeout <= 172800:
+        raise CaseError("Physical acquisition produces raw images; timeout must be between 60 and 172800 seconds.")
+    return dict(mode=mode, source=str(source or ""), disk_number=disk_number, kind=kind,
+                simulation=bool(simulation), max_bytes=max_bytes, format=image_format)
+
+
+def flow_candidate(job, flow_id=None):
+    if flow_id and (job.get("flow_id") and job["flow_id"] != flow_id
+                    or not re.fullmatch(r"F\.[A-Za-z0-9_-]+", flow_id)):
+        raise CaseError("Invalid or conflicting acquisition flow ID.")
+    candidate = flow_id or job.get("flow_id")
+    if not candidate:
+        raise CaseError("Attach the already-submitted flow using --flow-id.")
+    return candidate
+
+
+def new_job(case, client, kind, mode, operator, simulation=False, max_bytes=MAX_BYTES, image_format="raw"):
+    bound = binding(case, client)
+    validate_options(kind, operator, max_bytes, image_format)
     return dict(id="ACQ-" + uuid.uuid4().hex[:16], label=case.label, client_id=client,
                 org_id=bound["org_id"], hostname=bound["hostname"], kind=kind, mode=mode,
                 operator=operator.strip(), simulation=bool(simulation), max_bytes=max_bytes,
@@ -124,20 +156,11 @@ def preserve_metadata(case, job, raw, source):
 
 def start(case, client, kind, api, operator, source=None, disk_number=None, simulation=False,
           max_bytes=MAX_BYTES, image_format="raw", timeout=86400):
-    mode = "remote-file" if source else "remote-" + kind
-    if mode not in ARTIFACTS or simulation and not source:
-        raise CaseError("Simulation requires an explicit fixture file; physical acquisition is never simulated implicitly.")
-    if mode == "remote-disk" and (type(disk_number) is not int or not 0 <= disk_number <= 1024):
-        raise CaseError("Select the intended Windows disk number explicitly.")
-    if source and disk_number is not None or kind != "disk" and disk_number is not None:
-        raise CaseError("Choose a source image file or a physical disk number.")
-    if not source and image_format != "raw" or not 60 <= timeout <= 172800:
-        raise CaseError("Physical acquisition produces raw images; timeout must be between 60 and 172800 seconds.")
+    request = collection_request(kind, operator, source, disk_number, simulation, max_bytes, image_format, timeout)
+    mode = request["mode"]
     job = new_job(case, client, kind, mode, operator, simulation, max_bytes, image_format)
     if api.org != job["org_id"]:
         raise CaseError("API organization differs from the case binding.")
-    request = dict(mode=mode, source=str(source or ""), disk_number=disk_number, kind=kind,
-                   simulation=bool(simulation), max_bytes=max_bytes, format=image_format)
     state = load(case)
     for old in state["jobs"].values():
         if old["client_id"] == client and old["kind"] == kind and old["status"] in ACTIVE:
@@ -251,7 +274,7 @@ def transfer(case, state, job, reader, chunk_size=CHUNK):
             if job["offset"]:
                 raise CaseError("Saved partial evidence is missing.")
             h = hashlib.sha256()
-        if shutil.disk_usage(part.parent).free < expected - job["offset"] + 16 * CHUNK:
+        if shutil.disk_usage(part.parent).free < expected - job["offset"] + RESERVE_BYTES:
             raise CaseError("Insufficient free space for the remaining image and a 16 MiB reserve.")
         job["status"] = "downloading"
         persist(case, state, job)
@@ -314,12 +337,7 @@ def resume(case, job_id, api=None, download_api=None, flow_id=None, chunk_size=C
         download_api = download_api or api
         if download_api.org != job["org_id"]:
             raise CaseError("Download API organization differs from the case binding.")
-        if flow_id:
-            if job.get("flow_id") and job["flow_id"] != flow_id or not re.fullmatch(r"F\.[A-Za-z0-9_-]+", flow_id):
-                raise CaseError("Invalid or conflicting acquisition flow ID.")
-        candidate = flow_id or job.get("flow_id")
-        if not candidate:
-            raise CaseError("Attach the already-submitted flow using --flow-id.")
+        candidate = flow_candidate(job, flow_id)
         variables = dict(ClientId=job["client_id"], FlowId=candidate, ArtifactName=job["artifact"])
         raw, rows = api.query("SELECT get_flow(client_id=ClientId,flow_id=FlowId) AS Flow FROM scope()", variables)
         flow = rows[0]["Flow"]

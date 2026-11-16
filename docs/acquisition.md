@@ -45,6 +45,94 @@ client/FQDN against this binding. Flow recovery also checks organization, client
 artifact, request ID and parameters. Bindings cannot be reassigned in place.
 The inert offline demo's synthetic binding is for generated fixtures only.
 
+## Read-only preflight
+
+Version 0.2 adds `--preflight` to the existing import, collect and sync operations.
+Use their normal source, operator, binding, format, budget and timeout arguments.
+The same pure parameter validators serve planning and actual acquisition.
+The case must already exist and be bound; a missing case/root produces a failed
+plan without creating directories. Pending metadata transactions are reported,
+not repaired. No case lock, report, ledger, journal or evidence file is written.
+
+```powershell
+hashbrown --root D:\HashBrownCases acquisition import HB-2026-REPLACE `
+  --client-id C.0123456789abcdef --kind disk --file D:\Evidence\disk.raw `
+  --operator 'Analyst J' --max-bytes 137438953472 --preflight --plan-format text
+
+hashbrown --root D:\HashBrownCases acquisition collect HB-2026-REPLACE `
+  --client-id C.0123456789abcdef --kind memory --operator 'Analyst J' `
+  --max-bytes 34359738368 --declared-bytes 17179869184 --preflight `
+  --velociraptor C:\IR\velociraptor.exe --api-config C:\IR\api.yaml
+```
+
+The second command describes a hypothetical collection; it executes no collector
+and contacts no server. `--declared-bytes` is an unverified size estimate **only
+accepted with `--preflight`**. It does not carry into a later capture or impose an
+expected length. Without a declaration or saved descriptor, source extent remains
+unknown and the plan uses `--max-bytes` as a capacity ceiling. An observed local
+file or declared size above the budget fails preflight. A declaration inconsistent
+with observed file metadata or a saved descriptor also fails. A supplied SHA-256
+is syntax-checked only; no image is hashed by preflight.
+
+JSON is the default; `--plan-format text` renders the same checks and unknowns.
+The machine-readable schema contains `schema`, `tool`, `version`, `read_only`,
+`inspected_at`, `operation`, `case_id`, overall `status`, `checks`, `unknowns` and
+`plan`. Each check has `name`, `status`, `message` and `details`. Known plan fields
+include endpoint binding, mode, source host/size/basis, budget, output location and
+analyst filesystem capacity. Overall status is the most severe check:
+
+| Status / exit | Meaning |
+| --- | --- |
+| `pass` / `0` | No blocking local observation or actionable warning; explicit unknowns still apply |
+| `warning` / `2` | Unknown source extent/prerequisites or a condition requiring review |
+| `fail` / `1` | Invalid parameters, missing prerequisites/case, conflicting outputs, or insufficient planned capacity |
+
+Argument syntax errors retain normal CLI usage output and exit `2`. Supplying
+planning-only options without `--preflight` is rejected before case mutation.
+
+Local source and prerequisite checks inspect **regular-file metadata only**;
+neither image bytes nor API credential contents are opened. Config presence is
+not proof of valid credentials, organization or roles. The executable is not
+invoked or authenticated. Obvious device/network namespaces, Windows mapped
+network drives, device/FIFO inputs, and observed symlink/junction/reparse entries
+or ancestors are rejected before descending through them. Supply direct local
+paths without `..`; Windows 8.3 names are resolved to canonical paths after checks.
+Use a local filesystem: non-Windows network mount backends are not certified.
+These are filesystem observations, not a race-free guarantee against concurrent
+path replacement. No lock or write probe is taken.
+
+For a saved local import, explicitly identify the original source to permit its
+metadata/identity checks and comparison with the saved source and output files:
+
+```powershell
+hashbrown --root D:\HashBrownCases acquisition sync HB-2026-REPLACE `
+  --job ACQ-REPLACE --file D:\Evidence\disk.raw --preflight --plan-format text
+```
+
+`--file` on sync is preflight-only and cannot redirect a saved job. The plan checks
+canonical paths and file identity, detecting a source/output alias or hardlink
+before normal resume could truncate a partial output. Without explicit `--file`,
+source availability, unchanged metadata and same-file collisions remain a warning.
+It checks partial/final output types and lengths, including a missing checkpoint
+or simultaneous `.part`/`.bin` files. It does not validate the saved prefix hash;
+normal sync still performs its full checks. Already committed outputs require
+rehashing during sync and are not described as newly verified by the plan.
+
+New acquisitions have no allocated acquisition ID yet; the plan displays
+`<new-acquisition-id>` and checks the output parent directories. It cannot certify
+the future filename or reserve it. Matching unfinished remote requests are shown
+as reused jobs, consistent with `collect`'s existing no-duplicate behavior.
+
+Capacity is a snapshot of the **analyst case output filesystem**, not the enrolled
+endpoint or server. It uses remaining image bytes after the saved offset, plus the
+normal 16 MiB reserve; existing final images need no additional image allocation.
+An insufficient observed/declaration-based estimate is a planning failure. When
+extent is unknown, a budget-ceiling shortfall is a warning. No space is reserved,
+and permissions, concurrent writers or sparse-file behavior may change the result.
+Endpoint RAM staging space, remote upload storage, device extent, driver readiness,
+network connectivity, API privileges and capture completeness stay unknown.
+Neither this plan nor a successful fixture/hash check qualifies physical capture.
+
 ## Existing image on the enrolled endpoint
 
 ```powershell

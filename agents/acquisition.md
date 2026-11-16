@@ -22,6 +22,13 @@ Preserve these invariants:
   actions. Explain that the local chain can be wholly rewritten by a privileged actor.
 - Use case locks and atomic metadata writes. Reject unregistered binary/raw evidence.
 - Keep the separate binary-download credential option; `fs_sparse` needs SERVER_ADMIN.
+- Route read-only preflight before case locks/verification/repair. Share pure request
+  validation with execution; never invoke API/collector operations from preflight.
+- Inspect only explicitly named regular local inputs after checking path ancestors.
+  Never open image or credential contents. Keep source/output alias checks for an
+  explicitly supplied saved import source, including hardlinks and Windows short paths.
+- Scope capacity observations to the analyst case filesystem, mark declarations
+  unverified and remote extent/staging/roles unknown. Plans never certify capture completeness.
 
 Validate changes with meaningful interruption, path/binding, source-change,
 metadata-tamper, custody and partial-capture tests. The inert demo and native file

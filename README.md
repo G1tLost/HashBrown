@@ -1,6 +1,6 @@
 # HashBrown
 
-**HashBrown 0.1.0 is a standalone disk/RAM acquisition and evidence-tracking tool.**
+**HashBrown 0.2.0 is a standalone disk/RAM acquisition and evidence-tracking tool.**
 It creates its own cases, imports existing image files, schedules Windows capture
 through an existing Velociraptor server, downloads preserved uploads in resumable
 chunks, checks SHA-256, and records a hash-chained custody history.
@@ -55,6 +55,42 @@ preserved. `--kind memory` accepts an existing memory image. `--format raw|vhdx|
 is a label for one file, not a format validator or a segmented-image merger.
 HashBrown does not collect VMDK dependencies. Use `--simulation` only for synthetic
 fixture files. The default maximum image size is 256 GiB; set `--max-bytes` when needed.
+
+## Read-only preflight
+
+Add `--preflight` to the same `acquisition import`, `collect`, or `sync` command
+before running it. The plan checks parameters, case/binding metadata, explicitly
+named local file metadata, output collisions and advisory free space on the
+**analyst's case output filesystem**. It never submits a collection, executes
+Velociraptor, loads a driver, opens image/credential contents, or writes evidence,
+reports, checkpoints or case locks.
+
+```powershell
+hashbrown --root D:\HashBrownCases acquisition import HB-2026-REPLACE `
+  --client-id C.0123456789abcdef --kind disk --file D:\Evidence\disk.raw `
+  --operator 'Analyst J' --preflight
+# Use --plan-format text for a readable plan instead of JSON.
+```
+
+The JSON includes `status`, individual `checks`, a `plan` and explicit `unknowns`.
+Preflight exits `0` for locally passing checks, `2` for warnings/unknown prerequisites,
+and `1` for blocking failures. Passing checks do not certify capture readiness or
+completeness. Usage errors still follow argparse's normal exit code `2`.
+
+Remote size is unknown unless a saved upload descriptor or optional
+`--declared-bytes N` supplies a planning estimate. A declaration is unverified and
+does not constrain a later capture. `--max-bytes` remains the actual byte budget.
+Client/server capacity, credential validity, roles, drivers and device extent
+remain unknown; preflight makes no remote API requests. Local paths must identify
+regular files/directories without observed linked/reparse ancestors. Use local
+storage; non-Windows mount backends cannot be certified by these checks.
+
+For saved local imports, `sync ... --preflight --file ORIGINAL` explicitly enables
+source identity and source/output same-file checks, including hardlinks and Windows
+short-path aliases. It cannot redirect the saved import. Without `--file`, those
+source checks remain unknown. New acquisition output IDs are allocated only during
+execution, so preflight checks their parent directory, not an as-yet-unallocated
+filename. See the [preflight details](docs/acquisition.md#read-only-preflight).
 
 ## Remote capture and recovery
 
@@ -112,9 +148,9 @@ The global `--root` option goes **before** the command. Its default is `./hashbr
 python -m unittest discover -s tests -v
 ```
 
-Thirty tests cover preserved hashes, interruption/resume, wrong endpoint/path,
+Fifty-two tests cover preserved hashes, interruption/resume, wrong endpoint/path,
 changed images, tampering, partial captures, custody, case isolation, metadata,
-artifact export and the inert CLI demo. Read the [validation record](docs/validation.md)
+artifact export, read-only preflight and the inert CLI demo. Read the [validation record](docs/validation.md)
 for precise boundaries. **Actual physical-device imaging and kernel-driver RAM
 capture have not been exercised.** The artifacts implement these operations,
 but the designated Windows VM acceptance step remains outstanding. Large-image
