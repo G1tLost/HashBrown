@@ -1,6 +1,7 @@
 # Validation record and outstanding acceptance
 
-Version: HashBrown 0.2.0. The standalone package has 52 automated unittest cases.
+Version: HashBrown 0.2.0. The repository has 65 automated unittest cases: the 52
+package/preflight cases plus 13 repository-only A2 acceptance-helper cases.
 
 Executed in the Windows development environment:
 
@@ -25,6 +26,10 @@ Executed in the Windows development environment:
 - Device/FIFO rejection and linked-ancestor rejection before leaf inspection.
 - Source/output hardlink identity, Windows short-path aliases and partial/final collisions.
 - Shared collection parameter validation and preflight-only options cannot redirect an actual sync.
+- A2 helper snapshots of explicit generated image files without case mutation.
+- Exact-target checks before an API client, bounded controlled checkpoints, and same-flow completion using API doubles.
+- Preserved runtime/reference/reader-output fingerprints; modified retained evidence is rejected.
+- Operator assertions and fixture hashes cannot grant native-capture or independent-readability qualification.
 
 Run from this repository or an independently installed source checkout:
 
@@ -46,6 +51,21 @@ two inert images verified, JSON/text plans and failure paths exercised, and case
 contents/modification times unchanged by preflight. The package resolved from the
 new environment's `site-packages`; neither sibling tool was installed. Hosted CI
 records the platform checks for each published revision.
+
+The subsequent repository-only A2 preparation adds `scripts/a2_lab.py` and the
+[designated-VM runbook](a2-lab-acceptance.md), without a package behavior/version change.
+All 65 development tests pass on Windows. No designated VM or exact live target was
+available during preparation, so the helper's remote checkpoint tests used API
+doubles only. This preparation does not change the outstanding physical capture,
+driver or independent-reader qualifications below. Any generated local fixture
+snapshot must retain `fixture-transfer` scope and `native_capture: not_executed`.
+
+The publishing coordinator independently built and installed the 0.2.0 wheel in a
+new HashBrown-only Windows environment using Python 3.14.7. All **65 tests passed
+with Python isolated mode**, and the installed smoke verified two inert images and
+unchanged evidence through preflight success/failure paths. The helper is tested
+from the repository against the installed package. No API or physical capture was
+used in these release checks.
 
 For the earlier **0.1.0** release, on 2026-11-16 the release coordinator built the wheel and installed it into a fresh
 HashBrown-only virtual environment. All 30 tests passed there. The installed demo

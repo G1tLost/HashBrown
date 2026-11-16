@@ -148,7 +148,7 @@ The global `--root` option goes **before** the command. Its default is `./hashbr
 python -m unittest discover -s tests -v
 ```
 
-Fifty-two tests cover preserved hashes, interruption/resume, wrong endpoint/path,
+The 52 package tests cover preserved hashes, interruption/resume, wrong endpoint/path,
 changed images, tampering, partial captures, custody, case isolation, metadata,
 artifact export, read-only preflight and the inert CLI demo. Read the [validation record](docs/validation.md)
 for precise boundaries. **Actual physical-device imaging and kernel-driver RAM
@@ -159,6 +159,13 @@ throughput and multi-terabyte operation have not been benchmarked.
 HashBrown provides acquisition and preservation. It does not supply filesystem
 analysis, Volatility analysis, write blocking, forensic conclusions, multiuser
 authorization, independent custody signatures or automatic incident correlation.
+
+The [A2 designated-VM acceptance procedure](docs/a2-lab-acceptance.md) and repository-only
+`scripts/a2_lab.py` prepare bounded transfer checkpoints and reviewable runtime,
+source, byte-integrity and reader-output records. The helper never submits a
+collection or automatically qualifies native capture/readability. Its 13 additional
+tests bring the repository suite to 65; package behavior remains at 0.2.0. Actual
+physical acceptance requires an explicitly designated VM and remains outstanding.
 
 MIT license. Selected earlier MIT-licensed acquisition code was adapted; see
 [third-party notices](THIRD_PARTY_NOTICES.md). HashBrown is independently installable
