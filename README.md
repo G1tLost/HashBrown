@@ -17,6 +17,63 @@ It has no runtime Python dependencies and no shared engine, installer, case stor
 or automatic linkage with other incident-response tools. Velociraptor is an
 external prerequisite only for remote acquisition. No binary is bundled or downloaded.
 
+## Permissions and execution boundaries
+
+**Offline evidence tracking needs local file access only.** No Microsoft 365,
+Google Workspace, GAM, Active Directory, domain-admin, cloud-admin or Velociraptor
+rights are required for `python -m hashbrown_ir.evidence register|verify`.
+Use an ordinary account that can read the authorized inputs; HashBrown does not
+grant access, change ACLs or bypass operating-system restrictions.
+
+| Workflow | Access actually needed | Writes and limits |
+| --- | --- | --- |
+| Generic `evidence register` | Read the specification and every selected regular file; traverse their parent directories. Create, write, hardlink and remove a temporary publication file in the existing output directory. | Publishes a new manifest outside the evidence root; does not copy or modify source files. Output must not exist. |
+| Generic `evidence verify` | Read the manifest and selected files beneath the explicit evidence root; traverse their directories. Supply the independently retained manifest SHA-256. | No case, report, checkpoint, lock or output writes. No target collection or network calls. |
+| Offline image import, demo, case/report commands and case `verify` | Read selected source images where applicable; create/read/write the analyst's case directory, lock, metadata, temporary files and image spool. | Imports copy images into local storage; verification can update custody/report data and recover pending metadata. These are not non-mutating case reads. No host administrator or device rights are needed for ordinary readable files. |
+| `--preflight` on import/collect/sync | Read local case metadata and inspect explicitly supplied paths and analyst-output filesystem capacity. | No API/collector execution, image/config-content reads, locks or case writes. Passing a plan does not validate credentials, remote permissions, staging capacity or capture readiness. |
+| Detached `handoff create|verify` | Read selected evidence and provenance. Creation additionally needs an external writable output directory supporting exclusive hardlink publication; verification needs only input access. | No original-case mutation or image copying. Creation writes a new manifest; verification does not. |
+
+**Live acquisition is implemented, but it is outside the suite's offline-only
+workflow and is not report-only or disabled by a global safety switch.** The
+separate offline evidence entrypoint exposes only registration and verification.
+The original `hashbrown` CLI still accepts `install`, `acquisition collect`
+and remote `sync`; absent `--preflight`, those paths can execute real operations.
+An explicit disk number is required for physical-disk collection, and simulation
+requires an explicitly named existing fixture file. These argument checks are not
+an authorization system. Do not run the live commands under an offline-only scope.
+
+For a separately authorized existing deployment, the permission boundaries are:
+
+- The analyst process needs access to the local Velociraptor executable and API
+  configuration, plus writable local case/spool storage. Credentials remain
+  external to evidence; they are not needed by offline registration.
+- The API identity must be authorized in the bound organization to inspect the
+  selected client, schedule its collection and read its results/uploads.
+  Velociraptor's [collection permission checks](https://docs.velociraptor.app/vql_reference/server/collect_client/)
+  depend on collection type and artifact policy; a read-results-only identity is
+  not a collection identity.
+- Artifact installation modifies the server's artifact repository and needs the
+  applicable [artifact-writer permission](https://docs.velociraptor.app/vql_reference/server/artifact_set/).
+  Binary retrieval through this implementation's
+  [`fs_sparse` accessor requires `SERVER_ADMIN`](https://docs.velociraptor.app/vql_reference/accessors/fs_sparse/)
+  in the bound organization. The existing separate download credential option
+  separates this powerful access from collection metadata access.
+- The enrolled client must be able to read an existing source file for file
+  collection. Physical disk reads instead need the endpoint's administrative
+  [direct-device access](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea#physical-disks-and-volumes).
+  RAM capture requires the elevated Windows x64 client and compatible driver
+  described in the packaged artifact; Velociraptor's
+  [WinPmem function requires `MACHINE_STATE`](https://docs.velociraptor.app/vql_reference/windows/winpmem/).
+  It writes a staged image in the client's temporary directory and uploads it.
+  Client temporary storage, server upload storage and analyst spool storage must
+  each be writable by their respective service/process identity and have capacity.
+
+Those live prerequisites are documented boundaries, not instructions to broaden
+host access or change driver/security policy. Actual native disk/RAM acceptance
+remains outstanding; successful fixture transfers or hashes do not qualify it.
+See [acquisition limits](docs/acquisition.md) and
+[offline evidence usage](docs/offline-evidence.md).
+
 ## Install and run the inert demo
 
 Python 3.12 or newer:
