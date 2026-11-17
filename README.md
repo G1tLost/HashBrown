@@ -1,5 +1,12 @@
 # HashBrown
 
+![HashBrown](docs/assets/HashBrown-Banner.png)
+
+[Offline prerequisites and safe validation](docs/prerequisites.md).
+
+Local prototype: [generic offline evidence registration](docs/offline-evidence.md).
+This separate entrypoint handles existing files only; live disk/RAM commands below are not read-only.
+
 **HashBrown 0.3.0 is a standalone disk/RAM acquisition and evidence-tracking tool.**
 It creates its own cases, imports existing image files, schedules Windows capture
 through an existing Velociraptor server, downloads preserved uploads in resumable
